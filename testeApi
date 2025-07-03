@@ -1,0 +1,92 @@
+package petstore.steps;
+
+import io.cucumber.java.en.*;
+import io.restassured.response.Response;
+import petstore.model.Order;
+import petstore.model.Pet;
+import petstore.service.PetStoreService;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+
+public class PetStoreSteps {
+
+    PetStoreService service = new PetStoreService();
+    Order order;
+    Pet pet;
+    Response response;
+
+    @Given("que eu tenho um pedido válido")
+    public void criarPedidoValido() {
+        order = new Order();
+        order.id = 12345L;
+        order.petId = 54321L;
+        order.quantity = 1;
+        order.shipDate = Instant.now().toString();
+        order.status = "placed";
+        order.complete = true;
+    }
+
+    @When("eu envio o pedido para a API")
+    public void enviarPedido() {
+        response = service.postOrder(order);
+    }
+
+    @Then("o pedido é criado com sucesso")
+    public void verificarPedidoCriado() {
+        response.then().statusCode(200);
+        assertEquals(order.id, response.jsonPath().getLong("id"));
+        assertEquals(order.status, response.jsonPath().getString("status"));
+    }
+
+    @When("eu pesquiso por um pet com ID inexistente")
+    public void pesquisarPetInexistente() {
+        response = service.getPetById(999999999L);
+    }
+
+    @Then("o sistema deve retornar erro 404 e mensagem {string}")
+    public void validarErro404(String mensagem) {
+        response.then().statusCode(404);
+        assertEquals(mensagem, response.jsonPath().getString("message"));
+    }
+
+    @Given("que eu tenho um pet existente com novos dados")
+    public void prepararPetParaAtualizacao() {
+        pet = new Pet();
+        pet.id = 3001L;
+        pet.name = "PetAtualizado";
+        pet.status = "available";
+        pet.photoUrls = List.of("http://foto.com/1");
+    }
+
+    @When("eu envio a atualização do pet")
+    public void atualizarPet() {
+        response = service.putPet(pet);
+    }
+
+    @Then("os dados do pet são atualizados com sucesso")
+    public void verificarAtualizacaoPet() {
+        response.then().statusCode(200);
+        assertEquals(pet.name, response.jsonPath().getString("name"));
+        assertEquals(pet.status, response.jsonPath().getString("status"));
+    }
+
+    @When("eu pesquiso por pets com status {string}")
+    public void pesquisarPetsPorStatus(String status) {
+        response = service.getPetsByStatus(status);
+    }
+
+    @Then("todos os pets retornados devem ter status {string}")
+    public void verificarStatusDosPets(String esperado) {
+        response.then().statusCode(200);
+        List<Map<String, Object>> pets = response.jsonPath().getList("$");
+        assertFalse(pets.isEmpty());
+        for (Map<String, Object> p : pets) {
+            assertEquals(esperado, p.get("status"));
+        }
+    }
+}
+
